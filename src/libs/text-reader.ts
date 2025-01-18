@@ -198,6 +198,58 @@ export const splitRegExp = (s: string, regexp: RegExp, options: {
     return segments
 }
 
+type TTokenType = 'plain' | 'quote' | 'nest'
+type TTokeCallback = (params: {
+    token: string; 
+    start: number;
+    end: number;
+    type: TTokenType;
+}) => void
+
+export const readToken = (s: string, callback: TTokeCallback, options: {
+    escape: number;
+    quotes: number[];
+    nests: Map<number, number>;
+    trimSplitter?: boolean;
+}) => {
+    let start = 0, end = start, t = '', splitter = ''
+    const invoke = (type: TTokenType, i: number) => {
+        end = i
+        if(end > start) {
+            const token = s.substring(start, end)
+            callback({ token, start, end, type })
+            start = end
+        }
+    }
+    for (let i = 0; i < s.length; i++) {
+        const ch = s.charCodeAt(i)
+        if (ch === options.escape) {
+            i += 1
+            continue
+        }
+        else if (options.quotes.indexOf(ch) > -1) {
+            invoke('plain', i)
+            const quoteEnd = readQuote(s, ch, i + 1, options)
+            if (quoteEnd < 0) {
+                break
+            }
+            i = quoteEnd
+            invoke('quote', i + 1)
+        }
+        else if (options.nests.has(ch)) {
+            invoke('plain', i)
+            const nestEnd = options.nests.get(ch)!
+            const nestEndIndex = readNest(s, nestEnd, i + 1, options)
+            if (nestEndIndex < 0) {
+                break
+            }
+            i = nestEndIndex
+            invoke('nest', i + 1)
+        }
+    }
+    invoke('plain', s.length)
+}
+
 type TextReaderOptions = {
     escape: number;
     quotes: number[];
@@ -232,6 +284,9 @@ export class TextReader {
     }
     splitRegExp(s: string, reg: RegExp, trimSplitter: boolean = true) {
         return splitRegExp(s, reg, { ...this.options, trimSplitter })
+    }
+    readToken(s: string, callback: TTokeCallback) {
+        return readToken(s, callback, this.options)
     }
 }
 

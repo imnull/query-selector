@@ -1,4 +1,5 @@
 import { DataSelector } from './src/index'
+import { selectorReader } from './src/libs/text-reader'
 
 
 const tar: any = {
@@ -37,4 +38,8 @@ queryList.forEach(query => {
     console.log(`    query:`, ds.query(query))
     console.log(`query-all:`, ds.queryAll(query))
     console.log('-'.repeat(18 + query.length))
+})
+
+selectorReader.readToken('> *[length > 0]".aaa bbb".123', p => {
+    console.log(p)
 })
