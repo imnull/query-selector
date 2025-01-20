@@ -1,4 +1,3 @@
-import { TBranch } from "./type";
 import { explodeChains } from './utils'
 import { selectorReader } from './text-reader'
 import { SelectorChain } from './selector-chain'
