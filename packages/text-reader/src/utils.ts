@@ -1,4 +1,5 @@
-import { TextReaderOptions, TextReaderOptionsBase, TMatcher, TTokeCallback, TTokens } from "./type"
+import { TextReaderOptions, TextReaderOptionsBase, TMatcher, TTokeCallback, TTokens, TMatchResolver, TMatcherBase, TMatchTool } from "./type"
+import { MatchChain } from './chain'
 
 export const ESCAPES = [92] // '\\'.charCodeAt(0)
 export const QUOTE_SINGLE = 39 // "'".charCodeAt(0)
@@ -28,6 +29,14 @@ const isNestStart = (ch: number, options: { nests: Map<number, number> }) => {
 }
 const isQuote = (ch: number, options: { quotes: number[] }) => {
     return options.quotes.includes(ch)
+}
+
+const isMatchResolver = (matcher: TMatcher): matcher is TMatchResolver => {
+    const v = matcher as any
+    return !!v
+        && typeof v === 'object'
+        && typeof v.resolver === 'function'
+        && v.matcher && (typeof v.matcher === 'string' || v.matcher instanceof RegExp)
 }
 
 const readToQuote = (s: string, quote: number, start: number = 0, options: {
@@ -95,12 +104,14 @@ const isPair = (s: string, start: number, options: TextReaderOptions) => {
     if (!leftMatcher) {
         return void (0)
     }
-    const leftEnd = genMatcher(leftMatcher)(s, start)
+    const matcher = genMatcher(leftMatcher)
+    const leftEnd = matcher.match(s, start)
     const left = s.substring(start, leftEnd + 1)
     return {
         left,
         start: start + left.length,
         matcher: pairs.get(leftMatcher)!,
+        resolver: matcher.resolver,
     }
 }
 
@@ -109,60 +120,90 @@ const isToken = (s: string, start: number, options: TextReaderOptions) => {
         return void (0)
     }
     const matcher = genMatcher(options.tokens)
-    const end = matcher(s, start)
+    const end = matcher.match(s, start)
     if (end > start) {
         return {
-            match: s.substring(start, end),
             index: end,
+            match: s.substring(start, end),
+            resolver: matcher.resolver,
         }
     }
     return void (0)
 }
 
-const genMatcher = (endpoint: TMatcher | TMatcher[]) => {
-    if (Array.isArray(endpoint)) {
-        const ms = endpoint.map(m => genMatcher(m))
-        return (s: string, i: number) => {
-            let idx = -1
-            if (ms.some(m => {
-                idx = m(s, i)
-                if (idx > -1) {
-                    return true
-                }
-                return false
-            })) {
-                return idx
+const genMatcherBase = (endpoint: TMatcherBase | MatchChain) => {
+    let match: (s: string, i: number) => number
+    if(endpoint instanceof MatchChain) {
+        match = (s, i) => endpoint.match(s, i)
+    } else if (typeof endpoint === 'string') {
+        match = (s, i) => {
+            if (s.substring(i, i + endpoint.length) === endpoint) {
+                return i + endpoint.length - 1
             }
             return -1
         }
-    } else {
-        let match: (s: string, i: number) => number
-        if (typeof endpoint === 'string') {
-            match = (s, i) => {
-                if (s.substring(i, i + endpoint.length) === endpoint) {
-                    return i + endpoint.length - 1
-                }
-                return -1
+    } else if (endpoint instanceof RegExp) {
+        match = (s, i) => {
+            const sub = s.substring(i)
+            const m = sub.match(endpoint)
+            if (m && m.index === 0) {
+                return i + m[0].length - 1
             }
-        } else if (endpoint instanceof RegExp) {
-            match = (s, i) => {
-                const sub = s.substring(i)
-                const m = sub.match(endpoint)
-                if (m && m.index === 0) {
-                    return i + m[0].length - 1
-                }
-                return -1
-            }
-        } else if (typeof endpoint === 'function') {
-            match = endpoint
-        } else {
-            match = () => -1
+            return -1
         }
-        return match
+    } else if (typeof endpoint === 'function') {
+        match = endpoint
+    } else {
+        match = () => -1
+    }
+    return match
+}
+
+export const genMatcher = (endpoint: TMatcher | MatchChain | (TMatcher | MatchChain)[]): TMatchTool => {
+    if (Array.isArray(endpoint)) {
+        const ms = endpoint.map(m => genMatcher(m))
+        let resolver: ((s: string) => string) | undefined = undefined
+        return {
+            match: (s, i) => {
+                let idx = -1
+                if (ms.some(m => {
+                    idx = m.match(s, i)
+                    if (idx > i) {
+                        resolver = m.resolver
+                        return true
+                    }
+                    return false
+                })) {
+                    return idx
+                }
+                return -1
+            },
+            resolver: s => {
+                return resolver ? resolver(s) : s
+            }
+        }
+
+    } else {
+        if(endpoint instanceof MatchChain) {
+            return {
+                match: (s, i) => endpoint.match(s, i),
+                resolver: endpoint.resolver || (s => s),
+            }
+        } else if (isMatchResolver(endpoint)) {
+            return {
+                match: genMatcherBase(endpoint.matcher),
+                resolver: endpoint.resolver,
+            }
+        } else {
+            return {
+                match: genMatcherBase(endpoint),
+                resolver: (s: string) => s,
+            }
+        }
     }
 }
 
-const readTo = (s: string, endpoint: TMatcher | TMatcher[], start: number, options: TextReaderOptionsBase) => {
+const readTo = (s: string, endpoint: TMatcher | MatchChain | (TMatcher | MatchChain)[], start: number, options: TextReaderOptionsBase) => {
 
     const match = genMatcher(endpoint);
 
@@ -188,10 +229,11 @@ const readTo = (s: string, endpoint: TMatcher | TMatcher[], start: number, optio
             }
             i = nestEndIndex
         }
-        else if ((endIndex = match(s, i)) > -1) {
+        else if ((endIndex = match.match(s, i)) > -1) {
             return {
                 match: s.substring(i, endIndex + 1),
                 index: endIndex,
+                resovler: match.resolver,
             }
         }
     }
@@ -202,11 +244,12 @@ export const readToken = (s: string, callback: TTokeCallback, options: TextReade
     let
         start = 0,
         end = start,
-        tmp: { start: number; matcher: TMatcher | TMatcher[]; left: string; } | undefined = undefined,
-        token: { match: string; index: number; } | undefined = undefined
+        tmpPair: ReturnType<typeof isPair> = undefined,
+        tmpToken: ReturnType<typeof isToken> = undefined
         ;
-    const invoke = (t: TTokens, i: number) => {
+    const invoke = (t: TTokens, i: number, resolver?: (s: string) => string) => {
         end = i
+        const r = typeof resolver === 'function' ? resolver : (s: string) => s
         if (end > start) {
             const raw = s.substring(start, end)
             const base = {
@@ -215,7 +258,7 @@ export const readToken = (s: string, callback: TTokeCallback, options: TextReade
                 startIndex: start,
                 endIndex: end,
             }
-            switch(t.type) {
+            switch (t.type) {
                 case 'nest':
                 case 'quote': {
                     base.content = base.raw.slice(1, -1)
@@ -226,6 +269,7 @@ export const readToken = (s: string, callback: TTokeCallback, options: TextReade
                     break
                 }
             }
+            base.content = r(base.content)
             callback({ ...base, ...t })
             start = end
         }
@@ -236,19 +280,19 @@ export const readToken = (s: string, callback: TTokeCallback, options: TextReade
             i += 1
             continue
         }
-        else if (token = isToken(s, i, options)) {
+        else if (tmpToken = isToken(s, i, options)) {
             invoke({ type: 'plain' }, i)
-            i = token.index
-            invoke({ type: 'token' }, i + 1)
+            i = tmpToken.index
+            invoke({ type: 'token' }, i + 1, tmpToken.resolver)
         }
-        else if (tmp = isPair(s, i, options)) {
+        else if (tmpPair = isPair(s, i, options)) {
             invoke({ type: 'plain' }, i)
-            const end = readTo(s, tmp.matcher, tmp.start, options)
+            const end = readTo(s, tmpPair.matcher, tmpPair.start, options)
             if (!end) {
                 return -1
             }
             i = end.index
-            invoke({ type: 'pair', left: tmp.left, right: end.match }, i + 1)
+            invoke({ type: 'pair', left: tmpPair.left, right: end.match }, i + 1, tmpPair.resolver)
         }
         else if (isQuote(ch, options)) {
             invoke({ type: 'plain' }, i)

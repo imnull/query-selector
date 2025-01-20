@@ -1,6 +1,8 @@
 import { TextReaderOptions, TextReaderOptionsInput, TTokeCallback } from "./type"
 import { BRACKETS, ESCAPES, QUOTES, readToken, split, splitRegExp } from "./utils"
 
+export { MatchChain } from './chain'
+
 export class TextReader {
     private readonly options: TextReaderOptions
     constructor(options: TextReaderOptionsInput = {}) {

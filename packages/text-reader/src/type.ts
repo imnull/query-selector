@@ -1,3 +1,4 @@
+import type { MatchChain } from './chain'
 export type TTokenBase = {
     raw: string;
     content: string;
@@ -25,11 +26,19 @@ export type TextReaderOptionsBase = {
     quotes: number[];
     nests: Map<number, number>;
 }
-export type TMatcher = string | RegExp | ((s: string, i: number) => number)
-export type TPairs = Map<TMatcher, TMatcher | TMatcher[]>
+export type TMatcherBase = string | RegExp | ((s: string, i: number) => number)
+export type TMatchResolver = { matcher: TMatcherBase | MatchChain; resolver: (content: string) => string }
+export type TMatcher = TMatcherBase | TMatchResolver
+
+export type TMatchTool = {
+    match: (s: string, i: number) => number;
+    resolver: (s: string) => string;
+}
+
+export type TPairs = Map<TMatcher, TMatcher | MatchChain | (TMatcher | MatchChain)[]>
 export type TextReaderOptions = TextReaderOptionsBase & {
     pairs?: TPairs;
-    tokens?: TMatcher | TMatcher[];
+    tokens?: TMatcher | MatchChain | (TMatcher | MatchChain)[];
 }
 
 export type TextReaderOptionsInput = {
