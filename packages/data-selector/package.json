@@ -1,0 +1,23 @@
+{
+  "name": "@imnull/data-selector",
+  "version": "1.0.0",
+  "main": "main/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "test": "ts-node test.ts",
+    "build": "tsc src/index.ts --outDir dist -d -m commonjs -t esnext"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "@imnull/text-reader": "^1.0.0"
+  }
+}

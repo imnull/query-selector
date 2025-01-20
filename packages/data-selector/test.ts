@@ -1,6 +1,4 @@
 import { DataSelector } from './src/index'
-import { selectorReader } from './src/libs/text-reader'
-
 
 const tar: any = {
     arr: [1, 2, 3, { abc: 1 }],
@@ -33,24 +31,10 @@ const queryList = [
     '*[@$=ber]',
     '*[@*=n]',
 ]
-// queryList.forEach(query => {
-//     console.log('-'.repeat(8) + ' ' + query + ' ' + '-'.repeat(8))
-//     console.log(`    query:`, ds.query(query))
-//     console.log(`query-all:`, ds.queryAll(query))
-//     console.log('-'.repeat(18 + query.length))
-// })
-
-// selectorReader.readToken('> *[length > 0]".aaa bbb".123', p => {
-//     console.log(p)
-// })
-
-selectorReader.update({
-    pairs: new Map([
-        [/#{2,}/, /#{3,}/]
-    ]),
-    tokens: ['let', 'active']
+queryList.forEach(query => {
+    console.log('-'.repeat(8) + ' ' + query + ' ' + '-'.repeat(8))
+    console.log(`    query:`, ds.query(query))
+    console.log(`query-all:`, ds.queryAll(query))
+    console.log('-'.repeat(18 + query.length))
 })
-console.log('-----')
-selectorReader.readToken('let a=0;[len>0] "123" ####v=="###"?"code":""###active', p => {
-    console.log(p)
-})
+

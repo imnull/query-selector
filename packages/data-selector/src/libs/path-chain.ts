@@ -136,8 +136,8 @@ export class PathChain extends Chain<TPathItem> {
         return typeof v === 'undefined' || v === null
     }
 
-    override next?: PathChain;
-    override previous?: PathChain
+    override next?: PathChain = undefined;
+    override previous?: PathChain = undefined;
 
     override checkValue(item: TPathItem) {
         return this.value === '*' || super.checkValue(item)
@@ -190,8 +190,8 @@ export class PathChainPro extends PathChain {
         return { depth, result }
     }
 
-    override next?: PathChainPro;
-    override previous?: PathChainPro;
+    override next?: PathChainPro = undefined;
+    override previous?: PathChainPro = undefined;
 
     checker?: PropChecker
 

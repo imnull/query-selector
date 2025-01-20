@@ -1,10 +1,13 @@
 {
-  "name": "query-selector",
+  "name": "@imnull/text-reader",
   "version": "1.0.0",
-  "private": true,
-  "main": "index.js",
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "test": "ts-node test.ts"
+    "test": "ts-node test.ts",
+    "build": "tsc src/index.ts --outDir dist -d -m commonjs -t esnext"
   },
   "keywords": [],
   "author": "",
@@ -13,8 +16,5 @@
   "devDependencies": {
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
-  },
-  "workspaces":[
-    "packages/*"
-  ]
+  }
 }

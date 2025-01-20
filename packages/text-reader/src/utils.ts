@@ -1,53 +1,17 @@
-type TTokenBase = {
-    raw: string;
-    content: string;
-    startIndex: number;
-    endIndex: number;
-}
-type TTokens = {
-    type: 'plain';
-} | {
-    type: 'token';
-} | {
-    type: 'nest' | 'pair';
-    left: string;
-    right: string;
-} | {
-    type: 'quote';
-    quote: string;
-}
-type TToken = TTokenBase & TTokens
+import { TextReaderOptions, TextReaderOptionsBase, TMatcher, TTokeCallback, TTokens } from "./type"
 
-type TTokeCallback = (token: TToken) => void
-
-type TextReaderOptionsBase = {
-    escapes: number[];
-    quotes: number[];
-    nests: Map<number, number>;
-}
-type TMatcher = string | RegExp | ((s: string, i: number) => number)
-type TPairs = Map<TMatcher, TMatcher | TMatcher[]>
-type TextReaderOptions = TextReaderOptionsBase & {
-    pairs?: TPairs;
-    tokens?: TMatcher | TMatcher[];
-}
-
-type TextReaderOptionsInput = {
-    [key in keyof TextReaderOptions]?: TextReaderOptions[key]
-}
-
-const ESCAPES = [92] // '\\'.charCodeAt(0)
-const QUOTE_SINGLE = 39 // "'".charCodeAt(0)
-const QUOTE_DOUBLE = 34 // '"'.charCodeAt(0)
-const QUOTE_CARET = 96 // '`'.charCodeAt(0)
-const QUOTES = [QUOTE_SINGLE, QUOTE_DOUBLE]
+export const ESCAPES = [92] // '\\'.charCodeAt(0)
+export const QUOTE_SINGLE = 39 // "'".charCodeAt(0)
+export const QUOTE_DOUBLE = 34 // '"'.charCodeAt(0)
+export const QUOTE_CARET = 96 // '`'.charCodeAt(0)
+export const QUOTES = [QUOTE_SINGLE, QUOTE_DOUBLE]
 // const BRACKETS = ['(', ')', '[', ']', '{', '}'].map(ch => ch.charCodeAt(0))
 // const BRACKETS = new Map<number, number>([
 //     ['('.charCodeAt(0), ')'.charCodeAt(0)],
 //     ['['.charCodeAt(0), ']'.charCodeAt(0)],
 //     ['{'.charCodeAt(0), '|'.charCodeAt(0)],
 // ])
-const BRACKETS = new Map<number, number>([
+export const BRACKETS = new Map<number, number>([
     // ()
     [40, 41],
     // []
@@ -401,35 +365,3 @@ export const splitRegExp = (s: string, regexp: RegExp, options: TextReaderOption
     }
     return segments
 }
-
-export class TextReader {
-    private readonly options: TextReaderOptions
-    constructor(options: TextReaderOptionsInput = {}) {
-        const {
-            escapes = ESCAPES,
-            quotes = QUOTES,
-            nests = BRACKETS
-        } = options
-        this.options = {
-            escapes,
-            quotes,
-            nests,
-        }
-    }
-
-    update(options: TextReaderOptionsInput) {
-        Object.assign(this.options, options)
-        return this
-    }
-    split(s: string, point: string | number | ((ch: number) => boolean)) {
-        return split(s, point, this.options)
-    }
-    splitRegExp(s: string, reg: RegExp, trimSplitter: boolean = true) {
-        return splitRegExp(s, reg, { ...this.options, trimSplitter })
-    }
-    readToken(s: string, callback: TTokeCallback) {
-        return readToken(s, callback, this.options)
-    }
-}
-
-export const selectorReader = new TextReader()
